@@ -1,0 +1,4 @@
+streamlit
+plotly
+sqlite3
+json
