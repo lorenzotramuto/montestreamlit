@@ -39,7 +39,7 @@ def create_weighted_results_plot(result, mean_val, target_value, formula_name, p
     fig.add_trace(go.Histogram(
         x=result,
         nbinsx=50,
-        name='WHat If Distribuzione',
+        name='Distribuzione What If ',
         opacity=0.75
     ))
     
