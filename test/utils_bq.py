@@ -5,13 +5,13 @@ import pandas as pd
 import json
 import re
 
-key_path = "service_rikkanza.json"
+key_path = "rikkanza.json"
 credentials = service_account.Credentials.from_service_account_file(key_path,scopes=["https://www.googleapis.com/auth/bigquery"])
 bq_client = bigquery.Client(credentials=credentials,project=credentials.project_id)
 
 project_id = "rikkanza"
 database = "montecarlo"
-table = "bbs"
+table = "testxxx"
 table_id = f"{project_id}.{database}.{table}"  # Full table path
 
 def column_names_normalize(df):
