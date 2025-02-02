@@ -99,14 +99,14 @@ def render_sensitivity_analysis(variables, samples, formula, target_value,
                 )
     
     # Creiamo slider per modificare i pesi delle variabili
-    st.markdown("#### Modifica dei Pesi delle Variabili")
+    st.markdown("#### What If Analysis")
     weights = {}
     weight_cols = st.columns(len(variables))
     
     for i, var_name in enumerate(variables.keys()):
         with weight_cols[i]:
             weights[var_name] = st.slider(
-                f"Peso {var_name}",
+                f"Var % {var_name}",
                 min_value=0.0,
                 max_value=2.0,
                 value=1.0,
@@ -146,11 +146,11 @@ def render_sensitivity_analysis(variables, samples, formula, target_value,
     with col3:
         st.metric("Deviazione Standard Pesata", f"{stats['std']:.1f}")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("5° Percentile Pesato", f"{stats['percentile_5']:.1f}")
-    with col2:
-        st.metric("95° Percentile Pesato", f"{stats['percentile_95']:.1f}")
+    # col1, col2 = st.columns(2)
+    # with col1:
+    #     st.metric("5° Percentile Pesato", f"{stats['percentile_5']:.1f}")
+    # with col2:
+    #     st.metric("95° Percentile Pesato", f"{stats['percentile_95']:.1f}")
     
     st.plotly_chart(fig, use_container_width=True)
 

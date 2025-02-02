@@ -244,8 +244,8 @@ def calculate_statistics(result, target_value, target_direction, formula_name):
         'mean': np.mean(result),
         'median': np.median(result),
         'std': np.std(result),
-        'percentile_5': np.percentile(result, 5),
-        'percentile_95': np.percentile(result, 95)
+        # 'percentile_5': np.percentile(result, 5),
+        # 'percentile_95': np.percentile(result, 95)
     }
     
     if target_direction == "Maggiore dell'obiettivo":
@@ -302,11 +302,11 @@ def display_results(stats, prob_text, fig):
     with col3:
         st.metric("Deviazione Standard", f"{stats['std']:.1f}")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("5° Percentile", f"{stats['percentile_5']:.1f}")
-    with col2:
-        st.metric("95° Percentile", f"{stats['percentile_95']:.1f}")
+    # col1, col2 = st.columns(2)
+    # with col1:
+    #     st.metric("5° Percentile", f"{stats['percentile_5']:.1f}")
+    # with col2:
+    #     st.metric("95° Percentile", f"{stats['percentile_95']:.1f}")
     
     st.plotly_chart(fig, use_container_width=True)
 
