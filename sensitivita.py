@@ -88,7 +88,7 @@ def render_sensitivity_analysis(variables, samples, formula, target_value,
     
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.markdown("#### Impatto delle Variabili sul Risultato")
+        st.markdown(f"#### Impatto delle Variabili sul {formula_name}")
         impact_cols = st.columns(len(variables))
         for i, (var_name, impact) in enumerate(impacts.items()):
             with impact_cols[i]:
