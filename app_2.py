@@ -1,61 +1,65 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
+import sqlite3
 import json
 from datetime import datetime
-import pandas as pd
-from utils_bq import write_dataframe_to_bigquery, execute_bigquery_and_get_dataframe
 
 st.set_page_config(layout="wide")
 
-# Database functions
+# Funzioni Database
+def init_db():
+    conn = sqlite3.connect('monte_carlo_configs.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS configurations
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT NOT NULL,
+                  description TEXT,
+                  config_data TEXT NOT NULL,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    conn.commit()
+    conn.close()
+
 def save_configuration(name, description, config_data):
-    df = pd.DataFrame({
-        'id': [int(datetime.now().timestamp())],  # Using timestamp as ID
-        'name': [name],
-        'description': [description],
-        'config_data': [json.dumps(config_data)],
-        'created_at': [datetime.now()]
-    })
-    write_dataframe_to_bigquery(df, how="WRITE_APPEND")
+    conn = sqlite3.connect('monte_carlo_configs.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO configurations (name, description, config_data) VALUES (?, ?, ?)",
+              (name, description, json.dumps(config_data)))
+    conn.commit()
+    conn.close()
 
 def update_configuration(config_id, config_data):
-    query = f"""
-    UPDATE `monte_carlo_configs.configurations`
-    SET config_data = '{json.dumps(config_data)}',
-        updated_at = CURRENT_TIMESTAMP()
-    WHERE id = {config_id}"""
-    df = pd.DataFrame([{'query': query}])
-    write_dataframe_to_bigquery(df, how="WRITE_APPEND")
+    conn = sqlite3.connect('monte_carlo_configs.db')
+    c = conn.cursor()
+    c.execute("UPDATE configurations SET config_data = ? WHERE id = ?",
+              (json.dumps(config_data), config_id))
+    conn.commit()
+    conn.close()
 
 def load_configurations():
-    # Assumiamo che execute_bigquery_and_get_dataframe() non accetti parametri
-    # e restituisca direttamente i dati dalla tabella configurations
-    df = execute_bigquery_and_get_dataframe()
-    if df is not None and not df.empty:
-        # Selezioniamo e ordiniamo i dati dopo averli ricevuti
-        df = df.sort_values('created_at', ascending=False)
-        return df[['id', 'name', 'description', 'created_at']].values.tolist()
-    return []
+    conn = sqlite3.connect('monte_carlo_configs.db')
+    c = conn.cursor()
+    c.execute("SELECT id, name, description, created_at FROM configurations ORDER BY created_at DESC")
+    configs = c.fetchall()
+    conn.close()
+    return configs
 
 def get_configuration(config_id):
-    df = execute_bigquery_and_get_dataframe()
-    if df is not None and not df.empty:
-        # Filtriamo i dati dopo averli ricevuti
-        config = df[df['id'] == config_id]
-        if not config.empty:
-            return json.loads(config.iloc[0]['config_data'])
-    return None
+    conn = sqlite3.connect('monte_carlo_configs.db')
+    c = conn.cursor()
+    c.execute("SELECT config_data FROM configurations WHERE id = ?", (config_id,))
+    config = c.fetchone()
+    conn.close()
+    return json.loads(config[0]) if config else None
 
 def delete_configuration(config_id):
-    query = f"""
-    DELETE FROM monte_carlo_configs.configurations 
-    WHERE id = {config_id}
-    """
-    df = pd.DataFrame({'statement': [query]})  # Changed 'query' to 'statement'
-    write_dataframe_to_bigquery(df, how="WRITE_APPEND")
+    conn = sqlite3.connect('monte_carlo_configs.db')
+    c = conn.cursor()
+    c.execute("DELETE FROM configurations WHERE id = ?", (config_id,))
+    conn.commit()
+    conn.close()
 
-# Simulation Function
+# Funzione Simulazione
 def generate_samples(dist_type, params, n_samples=10000):
     if dist_type == "Triangular":
         return np.round(np.random.triangular(params['lower'], params['mode'], params['upper'], n_samples))
@@ -65,24 +69,27 @@ def generate_samples(dist_type, params, n_samples=10000):
         return np.round(np.random.uniform(params['min'], params['max'], n_samples))
     return None
 
-# Initialize session state
+# Inizializza database
+init_db()
+
+# Inizializza session state
 if 'loaded_config' not in st.session_state:
     st.session_state.loaded_config = None
 if 'current_config_id' not in st.session_state:
     st.session_state.current_config_id = None
 
-# Sidebar Configuration
+# Configurazione Sidebar
 st.sidebar.title("Configurazione Simulazione")
 
-# Load configuration if present
+# Carica configurazione se presente
 if st.session_state.loaded_config:
     config_data = st.session_state.loaded_config
-    i = 0
-    for var_name, var_info in config_data['variables'].items():
+    for i in range(5):
         key = f"var_active_{i}"
-        if key not in st.session_state:
+        if key not in st.session_state and f"X{i+1}" in config_data['variables']:
             st.session_state[key] = True
-            st.session_state[f"var_name_{i}"] = var_name
+            var_info = config_data['variables'][f"X{i+1}"]
+            st.session_state[f"var_name_{i}"] = f"X{i+1}"
             st.session_state[f"dist_type_{i}"] = var_info['type']
             
             params = var_info['params']
@@ -104,28 +111,27 @@ if st.session_state.loaded_config:
                 st.session_state[f"max_{i}"] = params['max']
                 st.session_state[f"uni_min_range_{i}"] = params['min'] - 5
                 st.session_state[f"uni_max_range_{i}"] = params['max'] + 5
-        i += 1
 
-# Number of simulations
+# Numero simulazioni
 n_simulations = st.sidebar.slider("Numero di simulazioni", 
                                 min_value=1000, 
                                 max_value=100000, 
                                 value=st.session_state.loaded_config['n_simulations'] if st.session_state.loaded_config else 10000, 
                                 step=1000)
 
-# Variables dictionary
+# Dizionario variabili
 variables = {}
 
-# Variables Section
+# Sezione Variabili
 st.sidebar.markdown("## Variabili")
 
-# Add up to 5 variables
+# Aggiungi fino a 5 variabili
 for i in range(5):
     var_active = st.sidebar.checkbox(f"Variabile {i+1}", key=f"var_active_{i}")
     
     if var_active:
         with st.sidebar.expander(f"Configurazione Variabile {i+1}", expanded=True):
-            var_name = st.text_input("Nome", key=f"var_name_{i}")
+            var_name = st.text_input("Nome", value=f"X{i+1}", key=f"var_name_{i}")
             
             dist_type = st.selectbox(
                 "Distribuzione",
@@ -133,7 +139,7 @@ for i in range(5):
                 key=f"dist_type_{i}"
             )
             
-            # Range controls for sliders
+            # Controlli range per gli slider
             st.write("Configura Range Slider:")
             if dist_type == "Triangular":
                 col1, col2 = st.columns(2)
@@ -190,25 +196,25 @@ for i in range(5):
                 'params': params
             }
 
-# Formula Section
+# Sezione Formula
 st.sidebar.markdown("## Formula")
 available_vars = " ".join(variables.keys())
 st.sidebar.write(f"Variabili disponibili: {available_vars}")
-formula_name = st.sidebar.text_input("Nome del Risultato", value=st.session_state.loaded_config['formula_name'] if st.session_state.loaded_config else "Risultato Totale")
-formula = st.sidebar.text_input("Formula", value=st.session_state.loaded_config['formula'] if st.session_state.loaded_config else " + ".join(variables.keys()))
+formula_name = st.sidebar.text_input("Nome del Risultato", value="Risultato Totale")
+formula = st.sidebar.text_input("Formula", value=" + ".join(variables.keys()))
 
-# Target value
+# Valore obiettivo
 st.sidebar.markdown("## Obiettivo")
 target_value = st.sidebar.number_input("Valore Obiettivo", value=0, step=1)
 target_direction = st.sidebar.radio("Calcola Probabilità", 
                                   ["Maggiore dell'obiettivo", "Minore dell'obiettivo"],
                                   horizontal=True)
 
-# Save/Load Configuration Section
+# Sezione Salva/Carica Configurazione
 st.sidebar.markdown("---")
 st.sidebar.markdown("## Gestione Configurazioni")
 
-# Save/Update configuration
+# Salva/Aggiorna configurazione
 save_expander = st.sidebar.expander("Salva Configurazione")
 with save_expander:
     if st.session_state.current_config_id:
@@ -239,13 +245,12 @@ with save_expander:
         save_configuration(save_name, save_desc, config_data)
         st.success("Nuova configurazione salvata con successo!")
 
-# Load configuration
+# Carica configurazione
 load_expander = st.sidebar.expander("Carica Configurazione")
 with load_expander:
     configs = load_configurations()
     if configs:
-        # Modificato per usare solo name invece di timestamp
-        config_options = {f"{c[1]}": c[0] for c in configs}
+        config_options = {f"{c[1]} ({c[3][:10]})": c[0] for c in configs}
         selected_config = st.selectbox("Seleziona Configurazione", list(config_options.keys()))
         col1, col2 = st.columns(2)
         with col1:
@@ -253,26 +258,6 @@ with load_expander:
                 config_id = config_options[selected_config]
                 config_data = get_configuration(config_id)
                 if config_data:
-                    # Clear variable related session states
-                    for i in range(5):
-                        st.session_state.pop(f"var_active_{i}", None)
-                        st.session_state.pop(f"var_name_{i}", None)
-                        st.session_state.pop(f"dist_type_{i}", None)
-                        st.session_state.pop(f"lower_{i}", None)
-                        st.session_state.pop(f"mode_{i}", None)
-                        st.session_state.pop(f"upper_{i}", None)
-                        st.session_state.pop(f"min_range_{i}", None)
-                        st.session_state.pop(f"max_range_{i}", None)
-                        st.session_state.pop(f"mean_{i}", None)
-                        st.session_state.pop(f"std_{i}", None)
-                        st.session_state.pop(f"mean_min_{i}", None)
-                        st.session_state.pop(f"mean_max_{i}", None)
-                        st.session_state.pop(f"std_min_{i}", None)
-                        st.session_state.pop(f"std_max_{i}", None)
-                        st.session_state.pop(f"min_{i}", None)
-                        st.session_state.pop(f"max_{i}", None)
-                        st.session_state.pop(f"uni_min_range_{i}", None)
-                        st.session_state.pop(f"uni_max_range_{i}", None)
                     st.session_state.loaded_config = config_data
                     st.session_state.current_config_id = config_id
                     st.rerun()
@@ -288,28 +273,28 @@ with load_expander:
     else:
         st.info("Nessuna configurazione salvata")
 
-# Main content
+# Contenuto principale
 st.title("Simulazione Monte Carlo")
 
-# Auto-update results
+# Auto-aggiornamento risultati
 if variables:
     try:
-        # Generate samples
+        # Genera campioni
         samples = {}
         for var_name, var_info in variables.items():
             samples[var_name] = generate_samples(var_info['type'], var_info['params'], n_simulations)
         
-        # Evaluate formula
+        # Valuta formula
         result = eval(formula, {"__builtins__": {}}, samples)
         
-        # Calculate statistics
+        # Calcola statistiche
         mean_val = np.mean(result)
         median_val = np.median(result)
         std_val = np.std(result)
         percentile_5 = np.percentile(result, 5)
         percentile_95 = np.percentile(result, 95)
         
-        # Calculate probability relative to target
+        # Calcola probabilità rispetto all'obiettivo
         if target_direction == "Maggiore dell'obiettivo":
             prob = np.mean(result > target_value) * 100
             prob_text = f"P({formula_name} > {target_value}) = {prob:.1f}%"
@@ -317,7 +302,7 @@ if variables:
             prob = np.mean(result < target_value) * 100
             prob_text = f"P({formula_name} < {target_value}) = {prob:.1f}%"
         
-        # Results layout
+        # Layout risultati
         st.markdown(f"### {prob_text}")
         
         col1, col2, col3 = st.columns(3)
@@ -334,10 +319,10 @@ if variables:
         with col2:
             st.metric("95° Percentile", f"{percentile_95:.1f}")
         
-        # Create Plotly chart
+        # Crea grafico con Plotly
         fig = go.Figure()
         
-        # Add main histogram
+        # Aggiunge istogramma principale
         fig.add_trace(go.Histogram(
             x=result,
             nbinsx=50,
@@ -345,7 +330,7 @@ if variables:
             showlegend=True
         ))
         
-        # Add lines for mean and target
+        # Aggiunge linee per media e obiettivo
         fig.add_vline(x=mean_val, 
                      line_dash="dash", 
                      line_color="green", 
@@ -354,7 +339,7 @@ if variables:
                      line=dict(color="red", width=2),
                      annotation_text=f"Obiettivo: {target_value}")
         
-        # Customize chart layout
+        # Personalizza layout grafico
         fig.update_layout(
             title=f"Distribuzione di {formula_name} - {prob_text}",
             xaxis_title=formula_name,
@@ -363,7 +348,7 @@ if variables:
             height=600
         )
         
-        # Show chart
+        # Mostra grafico
         st.plotly_chart(fig, use_container_width=True)
             
     except Exception as e:
@@ -371,7 +356,7 @@ if variables:
 else:
     st.info("Attiva almeno una variabile nella sidebar per iniziare la simulazione.")
 
-# Instructions
+# Istruzioni
 st.sidebar.markdown("""
 ---
 ### Istruzioni:
