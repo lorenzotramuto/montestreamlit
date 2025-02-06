@@ -17,17 +17,17 @@ st.set_page_config(layout="wide", page_title="Monte Carlo Simulation")
 def get_config_manager():
     # Create credentials dict from st.secrets
     credentials = {
-        "type": st.secrets["gcp"]["type"],
-        "project_id": st.secrets["gcp"]["project_id"],
-        "private_key_id": st.secrets["gcp"]["private_key_id"],
-        "private_key": st.secrets["gcp"]["private_key"],
-        "client_email": st.secrets["gcp"]["client_email"],
-        "client_id": st.secrets["gcp"]["client_id"],
-        "auth_uri": st.secrets["gcp"]["auth_uri"],
-        "token_uri": st.secrets["gcp"]["token_uri"],
-        "auth_provider_x509_cert_url": st.secrets["gcp"]["auth_provider_x509_cert_url"],
-        "client_x509_cert_url": st.secrets["gcp"]["client_x509_cert_url"]
-    }
+                    "type": st.secrets["gcp"]["type"],
+                    "project_id": st.secrets["gcp"]["project_id"],
+                    "private_key_id": st.secrets["gcp"]["private_key_id"],
+                    "private_key": st.secrets["gcp"]["private_key"],
+                    "client_email": st.secrets["gcp"]["client_email"],
+                    "client_id": st.secrets["gcp"]["client_id"],
+                    "auth_uri": st.secrets["gcp"]["auth_uri"],
+                    "token_uri": st.secrets["gcp"]["token_uri"],
+                    "auth_provider_x509_cert_url": st.secrets["gcp"]["auth_provider_x509_cert_url"],
+                    "client_x509_cert_url": st.secrets["gcp"]["client_x509_cert_url"]
+                    }
     return ConfigurationManager(credentials=credentials)
 
 try:
@@ -37,10 +37,11 @@ except Exception as e:
     st.stop()
 
 # ============= Login System =============
-LOGIN = {
-    'test@gmail.com': '1234',
-    'riccardo.silvi@unibo.it': 'futura',
-}
+# LOGIN = {
+#     'test@gmail.com': '1234',
+#     'riccardo.silvi@unibo.it': 'futura',
+# }
+from password import LOGIN
 
 def authenticate(email, password):
     """Authenticate user with email and password"""
