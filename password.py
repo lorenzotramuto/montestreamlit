@@ -1,7 +1,7 @@
 LOGIN = {
 'test@gmail.com': '1234',
 'riccardo.silvi@unibo.it': 'futura',
-'danielegrottiuk@gmail.com':'futura'
+'danielegrottiuk@gmail.com':'futura',
 'gio.medugno@gmail.com': 'futura',
 'Fabrizio.muzzi@gmail.com': 'futura',
 'cristian.andreola@gmail.com': 'futura',
@@ -34,7 +34,6 @@ LOGIN = {
 'mauro.rambaldini@bbscommunity.it': 'futura',
 'Sergio.manera@bbscommunity.it': 'futura',
 'elisa.pizzardo@bbscommunity.it': 'futura',
-
         }
 
 
